@@ -1,0 +1,26 @@
+#!/bin/bash
+# Pause / resume / check the Magic Mouse auto-reconnect helper.
+#   mouse-auto off      pause
+#   mouse-auto on       resume (reconnects within one poll interval)
+#   mouse-auto status   show current state
+set -uo pipefail
+
+PAUSE_FLAG="$HOME/.magic-mouse-paused"
+
+case "${1:-status}" in
+  off|pause)
+    touch "$PAUSE_FLAG"
+    echo "Magic Mouse auto-reconnect: PAUSED"
+    ;;
+  on|resume)
+    rm -f "$PAUSE_FLAG"
+    echo "Magic Mouse auto-reconnect: ON"
+    ;;
+  status)
+    if [ -e "$PAUSE_FLAG" ]; then echo "PAUSED"; else echo "ON"; fi
+    ;;
+  *)
+    echo "usage: mouse-auto [on|off|status]"
+    exit 1
+    ;;
+esac
