@@ -87,6 +87,34 @@ mouse itself.
 Removes the agent and scripts. Leaves `blueutil` installed
 (`brew uninstall blueutil` to remove it too).
 
+## Design notes
+
+Decisions worth not re-litigating later:
+
+- **Always-on polling, not event-driven.** A tempting design is to sleep the
+  tool and only wake it on an event ("the mouse appeared"). macOS doesn't expose
+  a "paired device is now in range but not connected" event to hook, so there's
+  nothing reliable to wake on. Continuous polling is simpler and never misses.
+
+- **The 3-second check is a local status lookup, not a ping to the mouse.** Each
+  check asks macOS for the connection state it already tracks; it does not
+  transmit to the mouse, use the Bluetooth radio, or drain mouse battery. ~1,200
+  checks/hour sounds heavy but is featherweight, on the order of the countless
+  background timers macOS already runs. So there's no resource cost worth
+  optimising away, and no reason to add a sleep/wake cycle or a manual trigger.
+  (An event-driven "wake on menu-bar click, poll 3 min, sleep" version was
+  considered and dropped: it optimises a ~zero cost and reintroduces a manual
+  click for the case where the mouse is switched on after the poll window.)
+
+- **The mouse is matched by name, not a fixed address.** A Magic Mouse's
+  Bluetooth address can change on a re-pair; matching by name survives that.
+
+- **Bluetooth permission is a manual, one-time, per-Mac step.** `blueutil` needs
+  access under System Settings > Privacy & Security > Bluetooth. A background
+  script can't trigger the permission prompt itself, so it must be enabled by
+  hand once on each Mac. The startup log line (`Bluetooth access OK` / `DENIED`)
+  reports which state you're in.
+
 ## Future enhancements
 
 - Menu-bar toggle (click instead of `mouse-auto on/off`)
