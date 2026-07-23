@@ -31,11 +31,26 @@ mouse_address() {
 }
 
 log "started (watching for \"$MOUSE_NAME\", every ${POLL_INTERVAL}s)"
+
+# One-time startup self-check: confirm we can actually read Bluetooth. If this
+# says DENIED, grant blueutil access in System Settings > Privacy & Security >
+# Bluetooth (the permission is tied to blueutil, which launchd runs directly).
+if "$BLUEUTIL" --paired >/dev/null 2>&1; then
+  startup_addr="$(mouse_address)"
+  log "Bluetooth access OK; resolved \"$MOUSE_NAME\" -> ${startup_addr:-<not found>}"
+else
+  log "Bluetooth access DENIED — enable blueutil under Privacy & Security > Bluetooth"
+fi
+
 while true; do
   if [ ! -e "$PAUSE_FLAG" ]; then
     addr="$(mouse_address)"
     if [ -n "$addr" ] && [ "$("$BLUEUTIL" --is-connected "$addr" 2>/dev/null)" = "0" ]; then
-      "$BLUEUTIL" --connect "$addr" 2>/dev/null && log "reconnected $addr"
+      if "$BLUEUTIL" --connect "$addr" 2>/dev/null; then
+        log "reconnected $addr"
+      else
+        log "reconnect failed for $addr (out of range or powered off?)"
+      fi
     fi
   fi
   sleep "$POLL_INTERVAL"
