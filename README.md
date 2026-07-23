@@ -26,6 +26,12 @@ paired and in range but not connected, it reconnects it. If it's already
 connected, it does nothing. The mouse is matched **by name**, so a changed
 Bluetooth address (which can happen after a re-pair) doesn't break it.
 
+If the mouse is *away* (out of range, e.g. it went home with you while a Mac
+stays on), the script eases off instead of hammering: it spaces its reconnect
+attempts out to ~30s apart, then snaps back to instant the moment the mouse is
+back. So a Mac left running with the mouse elsewhere isn't burning its Bluetooth
+radio all day.
+
 It's wired up as a macOS **launch agent** so it starts at login and runs quietly
 in the background.
 
@@ -107,10 +113,14 @@ Decisions worth not re-litigating later:
   of the countless background timers macOS already runs. But the logs revealed the opposite
   for the away case: while the mouse is disconnected *and* out of range, `blueutil --connect`
   blocks ~15s on the radio chasing an absent device (failed attempts land ~18s apart, not
-  3s). So the thing to throttle is the *attempts*, not the glance — hence the attempt-backoff
-  (see Future enhancements), which throttles failing connects and resets on success and on
-  wake. (An earlier event-driven "wake on menu-bar click, poll 3 min, sleep" idea was dropped:
-  it optimises the already-free glance and reintroduces a manual click.)
+  3s). So the thing to throttle is the *attempts*, not the glance — hence the **attempt-backoff**
+  (shipped): the ~3s glance stays, but the expensive `--connect` is gated on wall-clock elapsed
+  time and grows 3s → ×2 → cap ~30s, resetting to 3s whenever the mouse is *seen* connected. The
+  reset is state-derived (re-read each tick), so it can't get stuck across sleep/wake or App Nap
+  and needs no separate wake-detection — a long gap simply reads as "time to try." Failures
+  aren't logged per-tick; only transitions are (lost / capped / reconnected), so a week away is a
+  handful of lines. (An earlier event-driven "wake on menu-bar click, poll 3 min, sleep" idea was
+  dropped: it optimises the already-free glance and reintroduces a manual click.)
 
 - **The mouse is matched by name, not a fixed address.** A Magic Mouse's
   Bluetooth address can change on a re-pair; matching by name survives that.
@@ -123,12 +133,6 @@ Decisions worth not re-litigating later:
 
 ## Future enhancements
 
-- **Reconnect-attempt backoff (agreed, next up).** Keep the ~3s glance, but gate the
-  expensive `--connect` on wall-clock elapsed time (`now - last_attempt >= interval`),
-  growing the interval on failure (3s → ×2 → cap ~30s) and resetting it to 3s whenever the
-  mouse is observed connected. Timestamp-gated, not sleep-based, so process suspension /
-  App Nap / sleep-wake can't leave it stuck (a long gap just reads as "time to try"), and no
-  explicit wake-detection is needed. Overridable via `MAGIC_MOUSE_MAX_BACKOFF`.
 - Menu-bar toggle (click instead of `mouse-auto on/off`)
 - Auto-pause when the built-in trackpad is actively in use
 - Optional support for Magic Trackpad / Magic Keyboard handoff
