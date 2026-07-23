@@ -53,8 +53,14 @@ echo
 echo "Installed and running."
 echo "  mouse-auto status   # check it"
 echo "  log: /tmp/$LABEL.log"
+# Make `mouse-auto` findable by name: ensure ~/bin is on PATH. Append a marked
+# line to ~/.zshrc if it's missing (idempotent — safe to re-run).
 case ":$PATH:" in
-  *":$BIN:"*) ;;
-  *) echo "  NOTE: add ~/bin to your PATH so 'mouse-auto' is found:"
-     echo "        echo 'export PATH=\"\$HOME/bin:\$PATH\"' >> ~/.zshrc" ;;
+  *":$BIN:"*) ;;  # already active in this shell
+  *)
+    if ! grep -q '# magic-mouse-auto PATH' "$HOME/.zshrc" 2>/dev/null; then
+      printf '\n# magic-mouse-auto PATH\nexport PATH="$HOME/bin:$PATH"\n' >> "$HOME/.zshrc"
+      echo "  Added ~/bin to your PATH in ~/.zshrc."
+    fi
+    echo "  Open a new terminal (or run 'source ~/.zshrc') so 'mouse-auto' works." ;;
 esac
