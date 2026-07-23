@@ -1,12 +1,12 @@
 # One Magic Mouse to Rule All Macs
 
-Auto-reconnect a single Apple Magic Mouse across two Macs, without the manual
-Bluetooth dance every time you switch machines.
+Auto-reconnect a single Apple Magic Mouse across two or more Macs, without the
+manual Bluetooth dance every time you switch machines.
 
 ## The problem
 
 Apple's Magic Mouse only holds one Mac connection at a time. If you use one
-mouse across two Macs (e.g. an office laptop and a home laptop), every switch
+mouse across several Macs (e.g. an office laptop and a home laptop), every switch
 means digging into Bluetooth to reconnect it by hand.
 
 This tool removes that step. A tiny background helper watches for the mouse and
@@ -28,6 +28,11 @@ Bluetooth address (which can happen after a re-pair) doesn't break it.
 
 It's wired up as a macOS **launch agent** so it starts at login and runs quietly
 in the background.
+
+**How many Macs?** No limit. Nothing pairs the Macs to each other, each Mac runs
+its own copy and only handles its own machine. Install it on as many Macs as you
+like; whichever one you're sitting at grabs the mouse. (The mouse itself still
+only connects to one Mac at a time, that's just how Bluetooth mice work.)
 
 ## Requirements
 
