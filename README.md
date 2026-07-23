@@ -91,20 +91,26 @@ Removes the agent and scripts. Leaves `blueutil` installed
 
 Decisions worth not re-litigating later:
 
-- **Always-on polling, not event-driven.** A tempting design is to sleep the
-  tool and only wake it on an event ("the mouse appeared"). macOS doesn't expose
-  a "paired device is now in range but not connected" event to hook, so there's
-  nothing reliable to wake on. Continuous polling is simpler and never misses.
+- **Always-on polling, not event-driven.** IOBluetooth *does* expose device-connect
+  notifications (`IOBluetoothRegisterForDeviceConnectNotifications`), so "macOS has no
+  events" would be wrong. But those fire only *after* a connection is established — they
+  answer "did something just connect?", not the question we need: "is the mouse in range
+  and connectable, so I should try now?" For a classic-Bluetooth HID that isn't currently
+  connected to this Mac, nothing on the Mac spontaneously starts a connection — our tool is
+  the only initiator. So there's no push signal for *when* to try; the only way to find out
+  is to attempt it. Hence polling — not for lack of any event, but because no event exists
+  for the half that matters (in-range-and-available), since we're the one initiating the attempt.
 
-- **The 3-second check is a local status lookup, not a ping to the mouse.** Each
-  check asks macOS for the connection state it already tracks; it does not
-  transmit to the mouse, use the Bluetooth radio, or drain mouse battery. ~1,200
-  checks/hour sounds heavy but is featherweight, on the order of the countless
-  background timers macOS already runs. So there's no resource cost worth
-  optimising away, and no reason to add a sleep/wake cycle or a manual trigger.
-  (An event-driven "wake on menu-bar click, poll 3 min, sleep" version was
-  considered and dropped: it optimises a ~zero cost and reintroduces a manual
-  click for the case where the mouse is switched on after the poll window.)
+- **The 3-second check is cheap; the *reconnect attempt* is the part that isn't.**
+  While the mouse is connected, each check just asks macOS for the state it already
+  tracks — no transmission, no radio, no mouse-battery cost; featherweight, on the order
+  of the countless background timers macOS already runs. But the logs revealed the opposite
+  for the away case: while the mouse is disconnected *and* out of range, `blueutil --connect`
+  blocks ~15s on the radio chasing an absent device (failed attempts land ~18s apart, not
+  3s). So the thing to throttle is the *attempts*, not the glance — hence the attempt-backoff
+  (see Future enhancements), which throttles failing connects and resets on success and on
+  wake. (An earlier event-driven "wake on menu-bar click, poll 3 min, sleep" idea was dropped:
+  it optimises the already-free glance and reintroduces a manual click.)
 
 - **The mouse is matched by name, not a fixed address.** A Magic Mouse's
   Bluetooth address can change on a re-pair; matching by name survives that.
@@ -117,6 +123,12 @@ Decisions worth not re-litigating later:
 
 ## Future enhancements
 
+- **Reconnect-attempt backoff (agreed, next up).** Keep the ~3s glance, but gate the
+  expensive `--connect` on wall-clock elapsed time (`now - last_attempt >= interval`),
+  growing the interval on failure (3s → ×2 → cap ~30s) and resetting it to 3s whenever the
+  mouse is observed connected. Timestamp-gated, not sleep-based, so process suspension /
+  App Nap / sleep-wake can't leave it stuck (a long gap just reads as "time to try"), and no
+  explicit wake-detection is needed. Overridable via `MAGIC_MOUSE_MAX_BACKOFF`.
 - Menu-bar toggle (click instead of `mouse-auto on/off`)
 - Auto-pause when the built-in trackpad is actively in use
 - Optional support for Magic Trackpad / Magic Keyboard handoff
